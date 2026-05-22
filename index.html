@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="description" content="Barbell plate calculator. Enter any weight — your 1RM, training max, top set — and see plates for every percentage from 100% down to 25%.">
+<title>Math My Barbell</title>
+<link rel="manifest" href="manifest.json">
+<script>
+  // Apply stored theme before paint to avoid flash
+  try {
+    const raw = localStorage.getItem('mmb:state:v1');
+    const theme = raw ? (JSON.parse(raw).theme || 'dark') : 'dark';
+    document.documentElement.dataset.theme = theme;
+  } catch (_) {
+    document.documentElement.dataset.theme = 'dark';
+  }
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='40' width='80' height='20' rx='3' fill='%23F97316'/%3E%3Crect x='10' y='25' width='12' height='50' rx='2' fill='%23F97316'/%3E%3Crect x='78' y='25' width='12' height='50' rx='2' fill='%23F97316'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0a;
+    --bg-elev: #161616;
+    --bg-input: #1f1f1f;
+    --fg: #f5f5f5;
+    --fg-muted: #a1a1a1;
+    --fg-dim: #525252;
+    --border: #2a2a2a;
+    --border-strong: #3a3a3a;
+    --accent: #f97316;
+    --accent-soft: rgba(249, 115, 22, 0.12);
+    --accent-fg: #ffffff;
+    --danger: #ef4444;
+    --shadow: 0 1px 0 rgba(255,255,255,0.04);
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #fafafa;
+    --bg-elev: #ffffff;
+    --bg-input: #ffffff;
+    --fg: #0a0a0a;
+    --fg-muted: #525252;
+    --fg-dim: #a3a3a3;
+    --border: #e5e5e5;
+    --border-strong: #d4d4d4;
+    --accent-soft: rgba(249, 115, 22, 0.08);
+    --shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root[data-theme="auto"] {
+      color-scheme: light;
+      --bg: #fafafa;
+      --bg-elev: #ffffff;
+      --bg-input: #ffffff;
+      --fg: #0a0a0a;
+      --fg-muted: #525252;
+      --fg-dim: #a3a3a3;
+      --border: #e5e5e5;
+      --border-strong: #d4d4d4;
+      --accent-soft: rgba(249, 115, 22, 0.08);
+      --shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  .container {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 20px 16px 80px;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .header-text { flex: 1; min-width: 0; }
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  h1 .dot {
+    color: var(--accent);
+  }
+
+  .tagline {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+
+  .theme-toggle {
+    flex-shrink: 0;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: color 0.1s, border-color 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .theme-toggle:hover {
+    color: var(--fg);
+    border-color: var(--border-strong);
+  }
+  .theme-toggle svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────── */
+  .panel {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-muted);
+  }
+
+  .weight-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .adjust {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    width: 44px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .adjust:active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .weight-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    text-align: center;
+    border-radius: var(--radius);
+    padding: 8px 4px;
+    width: 100%;
+    -moz-appearance: textfield;
+  }
+  .weight-input::-webkit-outer-spin-button,
+  .weight-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .weight-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* ── Bar row ─────────────────────────────────────────────── */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .row .label {
+    flex-shrink: 0;
+    min-width: 36px;
+  }
+
+  .chip-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .chip:hover { border-color: var(--border-strong); }
+  .chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  .chip.muted {
+    opacity: 0.4;
+    text-decoration: line-through;
+  }
+
+  /* ── Options details ─────────────────────────────────────── */
+  details.options {
+    border-top: 1px solid var(--border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  details.options summary {
+    cursor: pointer;
+    color: var(--fg-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  details.options summary::-webkit-details-marker { display: none; }
+  details.options summary::after {
+    content: "›";
+    font-family: var(--mono);
+    font-size: 14px;
+    transition: transform 0.15s;
+  }
+  details.options[open] summary::after {
+    transform: rotate(90deg);
+  }
+  .opt {
+    margin-top: 12px;
+  }
+  .opt .label {
+    display: block;
+    margin-bottom: 6px;
+  }
+  .opt-hint {
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-top: 4px;
+  }
+
+  /* ── Results list ────────────────────────────────────────── */
+  .results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .result-row {
+    border-bottom: 1px solid var(--border);
+  }
+  .result-row:last-child { border-bottom: none; }
+
+  .result-summary {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .result-summary:hover {
+    background: var(--accent-soft);
+  }
+  .result-row.is-top .result-summary {
+    background: var(--accent-soft);
+  }
+  .result-row.is-current .result-summary {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .result-row.is-current .pct,
+  .result-row.is-current .weight-display,
+  .result-row.is-current .weight-display .unit,
+  .result-row.is-current .chev {
+    color: var(--accent-fg);
+  }
+
+  .pct {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--fg-muted);
+  }
+  .weight-display {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .weight-display .unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-dim);
+    margin-left: 3px;
+  }
+  .chev {
+    color: var(--fg-dim);
+    font-family: var(--mono);
+    font-size: 16px;
+    transition: transform 0.15s;
+  }
+  .result-row.is-open .chev {
+    transform: rotate(90deg);
+  }
+
+  .result-detail {
+    padding: 0 16px 16px;
+    display: none;
+  }
+  .result-row.is-open .result-detail {
+    display: block;
+  }
+
+  .diagram {
+    width: 100%;
+    max-height: 110px;
+    display: block;
+  }
+  .breakdown {
+    margin-top: 6px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .breakdown.warn {
+    color: var(--danger);
+  }
+
+  /* ── Footer ──────────────────────────────────────────────── */
+  footer {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--fg-dim);
+  }
+  footer a {
+    color: var(--fg-muted);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--border-strong);
+    padding-bottom: 1px;
+  }
+  footer a:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .share-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .share-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .share-btn.copied {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--fg);
+    color: var(--bg);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-text">
+        <h1>Math My Barbell<span class="dot">.</span></h1>
+        <p class="tagline">Enter a weight. See plates for every percentage.</p>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" type="button" title="Switch theme" aria-label="Switch color theme">
+        <span id="theme-icon" aria-hidden="true"></span>
+        <span id="theme-label">Dark</span>
+      </button>
+    </header>
+
+    <div class="panel">
+      <div class="weight-row">
+        <button class="adjust" data-delta="-5" aria-label="Decrease weight">−</button>
+        <input
+          class="weight-input"
+          id="weight"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="any"
+          placeholder="225">
+        <button class="adjust" data-delta="5" aria-label="Increase weight">+</button>
+      </div>
+
+      <div class="row">
+        <span class="label">Bar</span>
+        <div class="chip-group" id="bar-chips" role="radiogroup" aria-label="Bar weight"></div>
+      </div>
+
+      <details class="options" id="options">
+        <summary>Options</summary>
+
+        <div class="opt">
+          <span class="label">Units</span>
+          <div class="chip-group" id="unit-chips" role="radiogroup" aria-label="Units"></div>
+        </div>
+
+        <div class="opt">
+          <span class="label">Round to</span>
+          <div class="chip-group" id="round-chips" role="radiogroup" aria-label="Rounding mode"></div>
+        </div>
+
+        <div class="opt">
+          <span class="label">Plates I have</span>
+          <div class="chip-group" id="plate-chips" aria-label="Available plates"></div>
+          <p class="opt-hint">Tap a plate to mark it as unavailable. Rows that need it will say so.</p>
+        </div>
+      </details>
+    </div>
+
+    <ol class="results" id="rows" aria-label="Plate breakdown by percentage"></ol>
+
+    <footer>
+      <button class="share-btn" id="share">Copy link</button>
+      <a href="mailto:adam@happydesigncompany.com?subject=Math%20My%20Barbell%20%E2%80%94%20feedback">Suggest an improvement</a>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ── Plate / bar config ──────────────────────────────────────
+  const UNITS = {
+    lb: {
+      plates: [45, 25, 15, 10, 5, 2.5],
+      bars: [45, 35, 15],
+      smallestPerSide: 2.5,
+      increment: 5,
+      defaultBar: 45,
+      defaultWeight: 225,
+      colors: {
+        45:  '#2563eb',
+        35:  '#eab308',
+        25:  '#16a34a',
+        15:  '#3f3f46',
+        10:  '#27272a',
+        5:   '#6b7280',
+        2.5: '#52525b',
+      },
+      widths: { 45: 14, 35: 13, 25: 12, 15: 10, 10: 9, 5: 7, 2.5: 6 },
+      bumpers: new Set([45, 35, 25, 15, 10]),
+    },
+    kg: {
+      plates: [25, 20, 15, 10, 5, 2.5, 1.25],
+      bars: [20, 15, 10],
+      smallestPerSide: 1.25,
+      increment: 2.5,
+      defaultBar: 20,
+      defaultWeight: 100,
+      colors: {
+        25:   '#dc2626',
+        20:   '#2563eb',
+        15:   '#eab308',
+        10:   '#16a34a',
+        5:    '#e5e5e5',
+        2.5:  '#dc2626',
+        1.25: '#9ca3af',
+      },
+      widths: { 25: 14, 20: 13, 15: 11, 10: 9, 5: 7, 2.5: 6, 1.25: 5 },
+      bumpers: new Set([25, 20, 15, 10]),
+    },
+  };
+
+  const PERCENTAGES = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25];
+
+  const STORAGE_KEY = 'mmb:state:v1';
+
+  // ── State ───────────────────────────────────────────────────
+  /**
+   * state shape:
+   *  { weight: number, bar: number, unit: 'lb'|'kg', round: 'nearest'|'up'|'down',
+   *    excluded: { lb: number[], kg: number[] },
+   *    openRow: number|null, currentRow: number|null }
+   */
+  const defaultState = () => ({
+    weight: UNITS.lb.defaultWeight,
+    bar: UNITS.lb.defaultBar,
+    unit: 'lb',
+    round: 'nearest',
+    excluded: { lb: [], kg: [] },
+    theme: 'dark',
+    openRow: 100,
+    currentRow: null,
+  });
+
+  function loadState() {
+    const s = defaultState();
+    // localStorage
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        Object.assign(s, parsed);
+        if (!s.excluded || typeof s.excluded !== 'object') s.excluded = { lb: [], kg: [] };
+        if (!Array.isArray(s.excluded.lb)) s.excluded.lb = [];
+        if (!Array.isArray(s.excluded.kg)) s.excluded.kg = [];
+        if (!['dark', 'light', 'auto'].includes(s.theme)) s.theme = 'dark';
+        // openRow is always 100 on load — don't persist
+        s.openRow = 100;
+        s.currentRow = null;
+      }
+    } catch (_) {}
+
+    // URL params override
+    const p = new URLSearchParams(location.search);
+    if (p.has('u') && (p.get('u') === 'lb' || p.get('u') === 'kg')) s.unit = p.get('u');
+    if (p.has('w')) {
+      const w = parseFloat(p.get('w'));
+      if (!Number.isNaN(w) && w >= 0) s.weight = w;
+    }
+    if (p.has('bar')) {
+      const b = parseFloat(p.get('bar'));
+      if (UNITS[s.unit].bars.includes(b)) s.bar = b;
+    }
+    if (p.has('r') && ['nearest', 'up', 'down'].includes(p.get('r'))) s.round = p.get('r');
+    if (p.has('x')) {
+      const xs = p.get('x').split(',').map(parseFloat).filter(n => !Number.isNaN(n));
+      s.excluded[s.unit] = xs.filter(n => UNITS[s.unit].plates.includes(n));
+    }
+
+    // Sanity: bar must match unit
+    if (!UNITS[s.unit].bars.includes(s.bar)) s.bar = UNITS[s.unit].defaultBar;
+    return s;
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        weight: state.weight,
+        bar: state.bar,
+        unit: state.unit,
+        round: state.round,
+        excluded: state.excluded,
+        theme: state.theme,
+      }));
+    } catch (_) {}
+    syncURL();
+  }
+
+  function syncURL() {
+    const p = new URLSearchParams();
+    p.set('w', formatNum(state.weight));
+    p.set('bar', formatNum(state.bar));
+    p.set('u', state.unit);
+    if (state.round !== 'nearest') p.set('r', state.round);
+    const x = state.excluded[state.unit];
+    if (x && x.length) p.set('x', x.slice().sort((a,b) => a-b).join(','));
+    const url = location.pathname + '?' + p.toString();
+    history.replaceState(null, '', url);
+  }
+
+  // ── Plate logic (mirrors src/components/PlateCalculator.jsx) ──
+  function calcPlates(targetWeight, barWeight, unit, excluded) {
+    if (targetWeight < barWeight) return null;
+    if (targetWeight === barWeight) return [];
+    const allowed = UNITS[unit].plates.filter(p => !excluded.includes(p));
+    let perSide = (targetWeight - barWeight) / 2;
+    const result = [];
+    for (const plate of allowed) {
+      while (perSide >= plate - 0.001) {
+        result.push(plate);
+        perSide -= plate;
+      }
+    }
+    if (perSide > 0.01) return null;
+    return result;
+  }
+
+  function effectiveIncrement(unit, excluded) {
+    const allowed = UNITS[unit].plates.filter(p => !excluded.includes(p));
+    if (allowed.length === 0) return UNITS[unit].increment;
+    return Math.min(...allowed) * 2;
+  }
+
+  function roundToPlateWeight(rawWeight, barWeight, unit, roundMode, excluded) {
+    const inc = effectiveIncrement(unit, excluded || []);
+    if (rawWeight <= barWeight) return barWeight;
+    const above = rawWeight - barWeight;
+    let rounded;
+    if (roundMode === 'up')        rounded = Math.ceil(above / inc - 0.0001) * inc;
+    else if (roundMode === 'down') rounded = Math.floor(above / inc + 0.0001) * inc;
+    else                           rounded = Math.round(above / inc) * inc;
+    return barWeight + rounded;
+  }
+
+  function formatPlateList(plates) {
+    if (!plates || plates.length === 0) return '';
+    const counts = {};
+    plates.forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+    return Object.entries(counts)
+      .sort((a, b) => parseFloat(b[0]) - parseFloat(a[0]))
+      .map(([w, c]) => `${c}×${w}`)
+      .join(' + ') + ' each side';
+  }
+
+  function formatNum(n) {
+    return Number(n).toString();
+  }
+
+  // ── Unit conversion ─────────────────────────────────────────
+  const LB_PER_KG = 2.2046226218;
+
+  function convertWeight(weight, fromUnit, toUnit) {
+    if (fromUnit === toUnit) return weight;
+    const raw = fromUnit === 'lb' ? weight / LB_PER_KG : weight * LB_PER_KG;
+    const inc = UNITS[toUnit].increment;
+    return Math.round(raw / inc) * inc;
+  }
+
+  function chooseBarForUnit(currentBar, fromUnit, toUnit) {
+    if (fromUnit === toUnit) return currentBar;
+    const rawInTo = fromUnit === 'lb' ? currentBar / LB_PER_KG : currentBar * LB_PER_KG;
+    const bars = UNITS[toUnit].bars;
+    return bars.reduce((best, b) =>
+      Math.abs(b - rawInTo) < Math.abs(best - rawInTo) ? b : best
+    , bars[0]);
+  }
+
+  // ── SVG diagram ─────────────────────────────────────────────
+  function buildDiagram(plates, barWeight, unit) {
+    const cfg = UNITS[unit];
+    const svgHeight = 100;
+    const barY = svgHeight / 2;
+    const barHeight = 10;
+    const collarWidth = 8;
+    const barStartX = 10;
+    const sleeveStartX = barStartX + 60;
+    const bumperHeight = 64;
+    const changeHeight = 40;
+    const plateGap = 2;
+
+    let x = sleeveStartX + collarWidth + 2;
+    const rects = plates.map(weight => {
+      const isBumper = cfg.bumpers.has(weight);
+      const h = isBumper ? bumperHeight : changeHeight;
+      const w = cfg.widths[weight] || 10;
+      const r = { x, y: barY - h/2, width: w, height: h, color: cfg.colors[weight], weight };
+      x += w + plateGap;
+      return r;
+    });
+
+    const totalWidth = Math.max(x + 30, 320);
+
+    let svg = `<svg viewBox="0 0 ${totalWidth} ${svgHeight}" class="diagram" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Loaded barbell diagram">`;
+    // Bar shaft
+    svg += `<rect x="${barStartX}" y="${barY - barHeight/2}" width="${x - barStartX + 10}" height="${barHeight}" rx="2" fill="#71717a"/>`;
+    // Collar
+    svg += `<rect x="${sleeveStartX}" y="${barY - 8}" width="${collarWidth}" height="16" rx="1" fill="#a1a1aa"/>`;
+    // Plates
+    rects.forEach(r => {
+      svg += `<rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="2" fill="${r.color}"/>`;
+      const isChange = !cfg.bumpers.has(r.weight);
+      const cx = r.x + r.width / 2;
+      const labelY = isChange ? barY + changeHeight/2 + 10 : barY + bumperHeight/2 + 12;
+      const isVertical = r.width < 8;
+      const tx = isVertical
+        ? `transform="rotate(90 ${cx} ${labelY})"`
+        : '';
+      const fs = isVertical ? 7 : 9;
+      svg += `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="${fs}" fill="#a1a1a1" font-family="ui-monospace, monospace" ${tx}>${r.weight}</text>`;
+    });
+    // Bar weight label
+    svg += `<text x="${barStartX + 30}" y="${barY - barHeight/2 - 6}" text-anchor="middle" font-size="10" fill="#888" font-family="ui-monospace, monospace">${barWeight} ${unit} bar</text>`;
+    if (plates.length > 0) {
+      svg += `<text x="${x + 18}" y="${barY + 4}" font-size="9" fill="#666" font-family="ui-monospace, monospace">each side</text>`;
+    }
+    svg += `</svg>`;
+    return svg;
+  }
+
+  // ── Render ──────────────────────────────────────────────────
+  const $weight     = document.getElementById('weight');
+  const $unitChips  = document.getElementById('unit-chips');
+  const $adjustBtns = document.querySelectorAll('.adjust');
+  const $barChips   = document.getElementById('bar-chips');
+  const $roundChips = document.getElementById('round-chips');
+  const $plateChips = document.getElementById('plate-chips');
+  const $rows       = document.getElementById('rows');
+  const $share      = document.getElementById('share');
+  const $toast      = document.getElementById('toast');
+  const $themeBtn   = document.getElementById('theme-toggle');
+  const $themeIcon  = document.getElementById('theme-icon');
+  const $themeLabel = document.getElementById('theme-label');
+
+  const THEME_ICONS = {
+    dark:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5z"/></svg>',
+    light: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>',
+    auto:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg>',
+  };
+  const THEME_LABELS = { dark: 'Dark', light: 'Light', auto: 'Auto' };
+  const THEME_CYCLE = { dark: 'light', light: 'auto', auto: 'dark' };
+
+  function applyTheme() {
+    document.documentElement.dataset.theme = state.theme;
+    $themeIcon.innerHTML = THEME_ICONS[state.theme];
+    $themeLabel.textContent = THEME_LABELS[state.theme];
+  }
+
+  function renderInputs() {
+    $weight.value = state.weight;
+
+    // Unit chips
+    $unitChips.innerHTML = ['lb', 'kg'].map(u => `
+      <button class="chip ${state.unit === u ? 'active' : ''}" data-unit="${u}" role="radio" aria-checked="${state.unit === u}">${u}</button>
+    `).join('');
+
+    // Bar chips
+    $barChips.innerHTML = UNITS[state.unit].bars.map(b => `
+      <button class="chip ${b === state.bar ? 'active' : ''}" data-bar="${b}" role="radio" aria-checked="${b === state.bar}">${b} ${state.unit}</button>
+    `).join('');
+
+    // Round chips
+    const roundLabels = { nearest: 'Nearest', up: 'Up', down: 'Down' };
+    $roundChips.innerHTML = Object.entries(roundLabels).map(([key, label]) => `
+      <button class="chip ${state.round === key ? 'active' : ''}" data-round="${key}" role="radio" aria-checked="${state.round === key}">${label}</button>
+    `).join('');
+
+    // Plate inventory chips
+    const excl = state.excluded[state.unit];
+    $plateChips.innerHTML = UNITS[state.unit].plates.map(p => `
+      <button class="chip ${excl.includes(p) ? 'muted' : 'active'}" data-plate="${p}" aria-pressed="${!excl.includes(p)}">${p}</button>
+    `).join('');
+  }
+
+  function renderRows() {
+    const w = Number(state.weight);
+    const html = PERCENTAGES.map(pct => {
+      const raw = w * pct / 100;
+      const rounded = roundToPlateWeight(raw, state.bar, state.unit, state.round, state.excluded[state.unit]);
+      const plates = calcPlates(rounded, state.bar, state.unit, state.excluded[state.unit]);
+      const classes = ['result-row'];
+      if (state.openRow === pct) classes.push('is-open');
+      if (state.currentRow === pct) classes.push('is-current');
+      if (pct === 100) classes.push('is-top');
+
+      let detail = '';
+      if (plates === null) {
+        if (rounded < state.bar) {
+          detail = `<p class="breakdown warn">Less than the ${state.bar} ${state.unit} bar</p>`;
+        } else {
+          detail = `<p class="breakdown warn">Can't make ${rounded} ${state.unit} with selected plates</p>`;
+        }
+      } else if (plates.length === 0) {
+        detail = `<p class="breakdown">Empty bar &mdash; no plates</p>`;
+      } else {
+        detail = buildDiagram(plates, state.bar, state.unit) +
+          `<p class="breakdown">${formatPlateList(plates)}</p>`;
+      }
+
+      return `
+        <li class="${classes.join(' ')}" data-pct="${pct}">
+          <div class="result-summary" role="button" tabindex="0" aria-expanded="${state.openRow === pct}">
+            <span class="pct">${pct}%</span>
+            <span class="weight-display">${formatNum(rounded)}<span class="unit"> ${state.unit}</span></span>
+            <span class="chev">›</span>
+          </div>
+          <div class="result-detail">${detail}</div>
+        </li>
+      `;
+    }).join('');
+    $rows.innerHTML = html;
+  }
+
+  function render() {
+    applyTheme();
+    renderInputs();
+    renderRows();
+    saveState();
+  }
+
+  // ── Event wiring ───────────────────────────────────────────
+  let toastTimer = null;
+  function showToast(msg) {
+    $toast.textContent = msg;
+    $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 1500);
+  }
+
+  $weight.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    state.weight = Number.isNaN(v) ? 0 : v;
+    state.currentRow = null;
+    renderRows();
+    saveState();
+  });
+  $weight.addEventListener('blur', () => {
+    if (!state.weight || state.weight < 0) {
+      state.weight = UNITS[state.unit].defaultWeight;
+      render();
+    }
+  });
+
+  $adjustBtns.forEach(b => {
+    b.addEventListener('click', () => {
+      const delta = state.unit === 'kg'
+        ? (b.dataset.delta === '-5' ? -2.5 : 2.5)
+        : parseFloat(b.dataset.delta);
+      state.weight = Math.max(0, (Number(state.weight) || 0) + delta);
+      state.currentRow = null;
+      render();
+    });
+  });
+
+  $unitChips.addEventListener('click', e => {
+    const t = e.target.closest('[data-unit]');
+    if (!t) return;
+    const to = t.dataset.unit;
+    if (to === state.unit) return;
+    const from = state.unit;
+    state.weight = convertWeight(Number(state.weight), from, to);
+    state.bar = chooseBarForUnit(state.bar, from, to);
+    state.unit = to;
+    state.currentRow = null;
+    render();
+  });
+
+  $barChips.addEventListener('click', e => {
+    const t = e.target.closest('[data-bar]');
+    if (!t) return;
+    state.bar = parseFloat(t.dataset.bar);
+    state.currentRow = null;
+    render();
+  });
+
+  $roundChips.addEventListener('click', e => {
+    const t = e.target.closest('[data-round]');
+    if (!t) return;
+    state.round = t.dataset.round;
+    render();
+  });
+
+  $plateChips.addEventListener('click', e => {
+    const t = e.target.closest('[data-plate]');
+    if (!t) return;
+    const p = parseFloat(t.dataset.plate);
+    const excl = state.excluded[state.unit];
+    const i = excl.indexOf(p);
+    if (i === -1) excl.push(p);
+    else excl.splice(i, 1);
+    render();
+  });
+
+  $rows.addEventListener('click', e => {
+    const summary = e.target.closest('.result-summary');
+    if (!summary) return;
+    const row = summary.closest('.result-row');
+    const pct = Number(row.dataset.pct);
+    if (state.openRow === pct) {
+      state.openRow = null;
+      state.currentRow = null;
+    } else {
+      state.openRow = pct;
+      state.currentRow = pct;
+    }
+    render();
+  });
+
+  $rows.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const summary = e.target.closest('.result-summary');
+    if (!summary) return;
+    e.preventDefault();
+    summary.click();
+  });
+
+  $themeBtn.addEventListener('click', () => {
+    state.theme = THEME_CYCLE[state.theme] || 'dark';
+    applyTheme();
+    saveState();
+  });
+
+  $share.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      $share.textContent = 'Copied!';
+      $share.classList.add('copied');
+      showToast('Link copied to clipboard');
+      setTimeout(() => {
+        $share.textContent = 'Copy link';
+        $share.classList.remove('copied');
+      }, 1500);
+    } catch (_) {
+      showToast(location.href);
+    }
+  });
+
+  // ── Boot ───────────────────────────────────────────────────
+  const state = loadState();
+  // Initial render uses URL-supplied state if present
+  render();
+})();
+</script>
+</body>
+</html>

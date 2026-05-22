@@ -1,0 +1,18 @@
+{
+  "name": "Math My Barbell",
+  "short_name": "MMB",
+  "description": "Barbell plate calculator. Enter any weight, see plates for every percentage from 100% to 25%.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='40' width='80' height='20' rx='3' fill='%23F97316'/%3E%3Crect x='10' y='25' width='12' height='50' rx='2' fill='%23F97316'/%3E%3Crect x='78' y='25' width='12' height='50' rx='2' fill='%23F97316'/%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
