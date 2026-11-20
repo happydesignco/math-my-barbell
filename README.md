@@ -9,7 +9,7 @@ Single self-contained `index.html` file — no build step, no dependencies.
 ## Features
 
 - Lb and kg, with conversion when you toggle units
-- Bar selection (lb: 45/35/15, kg: 20/15/10)
+- Bar selection (lb: 45/35/15 plus a 65 lb trap bar, kg: 20/15/10)
 - Custom plate inventory — toggle off plates you don't have
 - Round mode: nearest / up / down
 - Tap a row to see the loaded bar diagram

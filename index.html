@@ -536,7 +536,8 @@
   const UNITS = {
     lb: {
       plates: [45, 25, 15, 10, 5, 2.5],
-      bars: [45, 35, 15],
+      bars: [45, 35, 15, 65],
+      trapBar: 65,
       smallestPerSide: 2.5,
       increment: 5,
       defaultBar: 45,
@@ -773,7 +774,7 @@
       svg += `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="${fs}" fill="#a1a1a1" font-family="ui-monospace, monospace" ${tx}>${r.weight}</text>`;
     });
     // Bar weight label
-    svg += `<text x="${barStartX + 30}" y="${barY - barHeight/2 - 6}" text-anchor="middle" font-size="10" fill="#888" font-family="ui-monospace, monospace">${barWeight} ${unit} bar</text>`;
+    svg += `<text x="${barStartX + 30}" y="${barY - barHeight/2 - 6}" text-anchor="middle" font-size="10" fill="#888" font-family="ui-monospace, monospace">${barWeight} ${unit} ${barWeight === UNITS[unit].trapBar ? 'trap bar' : 'bar'}</text>`;
     if (plates.length > 0) {
       svg += `<text x="${x + 18}" y="${barY + 4}" font-size="9" fill="#666" font-family="ui-monospace, monospace">each side</text>`;
     }
@@ -819,7 +820,7 @@
 
     // Bar chips
     $barChips.innerHTML = UNITS[state.unit].bars.map(b => `
-      <button class="chip ${b === state.bar ? 'active' : ''}" data-bar="${b}" role="radio" aria-checked="${b === state.bar}">${b} ${state.unit}</button>
+      <button class="chip ${b === state.bar ? 'active' : ''}" data-bar="${b}" role="radio" aria-checked="${b === state.bar}">${b} ${state.unit}${b === UNITS[state.unit].trapBar ? ' trap' : ''}</button>
     `).join('');
 
     // Round chips
